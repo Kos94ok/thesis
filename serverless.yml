@@ -1,0 +1,185 @@
+service: thesis
+provider:
+  name: aws
+  stage: dev
+  region: eu-central-1
+  runtime: nodejs8.10
+  memorySize: 128
+  timeout: 3
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["UserDynamoDbTable", "Arn" ] }
+        - { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }
+        - { "Fn::Join": [ "/", [ 
+           { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }, "index", "senderIndex" 
+          ]]}
+        - { "Fn::Join": [ "/", [
+            { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }, "index", "receiverIndex" 
+          ]]}
+        - { "Fn::Join": [ "/", [
+            { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }, "index", "messageIndex"
+          ]]}
+  environment:
+    DB_TABLE_USER: ${self:service}-${opt:stage, self:provider.stage}-user3
+    DB_TABLE_MESSAGE: ${self:service}-${opt:stage, self:provider.stage}-message2
+
+
+functions:
+  register:
+    handler: handler.register
+    events:
+      - http:
+          path: register
+          method: POST
+          cors: true
+  registerCognito:
+    handler: handler.registerCognito
+    events:
+      - http:
+          path: registerCognito
+          method: POST
+          cors: true
+  getMessage:
+    handler: handler.getMessage
+    events:
+      - http:
+          path: message/get
+          method: GET
+          cors: true
+  sendMessage:
+    handler: handler.sendMessage
+    events:
+      - http:
+          path: message/send
+          method: POST
+          cors: true
+
+
+resources:
+  Resources:
+    UserDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: username
+            AttributeType: S
+          - AttributeName: apptoken
+            AttributeType: S
+          - AttributeName: secret
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        GlobalSecondaryIndexes:
+          - IndexName: usernameIndex
+            KeySchema:
+              - AttributeName: username
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: apptokenIndex
+            KeySchema:
+              - AttributeName: apptoken
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: secretIndex
+            KeySchema:
+              - AttributeName: secret
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: timestampIndex
+            KeySchema:
+              - AttributeName: timestamp
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DB_TABLE_USER}
+    MessageDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: sender
+            AttributeType: S
+          - AttributeName: receiver
+            AttributeType: S
+          - AttributeName: message
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        GlobalSecondaryIndexes:
+          - IndexName: senderIndex
+            KeySchema:
+              - AttributeName: sender
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: receiverIndex
+            KeySchema:
+              - AttributeName: receiver
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: messageIndex
+            KeySchema:
+              - AttributeName: message
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: timestampIndex
+            KeySchema:
+              - AttributeName: timestamp
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DB_TABLE_MESSAGE}
