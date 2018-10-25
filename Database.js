@@ -5,9 +5,9 @@ const uuidv4 = require('uuid/v4');
 const bcrypt = require('bcryptjs');
 
 AWS.config.update({region: 'eu-central-1'});
-var ddb = new AWS.DynamoDB();
+let ddb = new AWS.DynamoDB();
 
-var resolvePromise = function(resolve, reject, data, err) {
+let resolvePromise = function(resolve, reject, data, err) {
   if (err) {
     reject(err);
   } else {
@@ -17,8 +17,8 @@ var resolvePromise = function(resolve, reject, data, err) {
 
 module.exports = {
   isUserRegistered: function(username, apptoken, secret) {
-    var userId = apptoken + '/' + username;
-    var dbParams = {
+    let userId = apptoken + '/' + username;
+    let dbParams = {
       TableName: process.env.DB_TABLE_USER,
       Key: {
         'id': { S: userId },
@@ -26,22 +26,22 @@ module.exports = {
     };
     return new Promise(function(resolve, reject) {
       ddb.getItem(dbParams, function(err, data) {
-        var isObjectFound = false;
+        let isObjectFound = false;
         if (Object.keys(data).length > 0) {
           isObjectFound = true;
-          var hashedSecret = data.Item.secret.S;
+          let hashedSecret = data.Item.secret.S;
         }
-        var isUserRegistered = isObjectFound && (secret === undefined || bcrypt.compareSync(secret, hashedSecret));
+        let isUserRegistered = isObjectFound && (secret === undefined || bcrypt.compareSync(secret, hashedSecret));
         resolvePromise(resolve, reject, isUserRegistered, err);
       });
     });
   },
   
   registerUser: function(username, apptoken, secret) {
-    var userId = apptoken + '/' + username;
-    var timestamp = new Date().getTime().toString();
-    var secretHash = bcrypt.hashSync(secret, 1);
-    var dbParams = {
+    let userId = apptoken + '/' + username;
+    let timestamp = new Date().getTime().toString();
+    let secretHash = bcrypt.hashSync(secret, 1);
+    let dbParams = {
       TableName: process.env.DB_TABLE_USER,
       Item: {
         'id': { S: userId },
@@ -59,7 +59,7 @@ module.exports = {
   },
   
   getMessage: function(messageId) {
-    var dbParams = {
+    let dbParams = {
       TableName: process.env.DB_TABLE_MESSAGE,
       Key: {
         'id': { S: messageId },
@@ -73,9 +73,9 @@ module.exports = {
   },
   
   createMessage: function(sender, receiver, message) {
-    var messageId = uuidv4();
-    var timestamp = new Date().getTime().toString();
-    var dbParams = {
+    let messageId = uuidv4();
+    let timestamp = new Date().getTime().toString();
+    let dbParams = {
       TableName: process.env.DB_TABLE_MESSAGE,
       Item: {
         'id': { S: messageId },

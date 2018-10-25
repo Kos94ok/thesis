@@ -12,8 +12,8 @@ module.exports = {
   },
   
   getMissingParams: function(params, requiredParams) {
-    var missingParams = [];
-    for (var i = 0; i < requiredParams.length; i++) {
+    let missingParams = [];
+    for (let i = 0; i < requiredParams.length; i++) {
       if (params[requiredParams[i]] === undefined) {
         missingParams.push(requiredParams[i]);
       }
@@ -22,7 +22,7 @@ module.exports = {
   },
   
   missingParamsInstance: function(missingParams) {
-    var responseBody = {
+    let responseBody = {
       error: "Missing required parameters",
       missingParameters: missingParams,
     };

@@ -2,12 +2,12 @@
 
 module.exports = {
   parseParams: function(params) {
-    var parsedParams = {};
-    var paramsArray = params.split('&');
-    for (var i = 0; i < paramsArray.length; i++) {
-      var key = paramsArray[i].split('=')[0];
-      var value = paramsArray[i].split('=')[1];
-      var decodedValue = decodeURIComponent(value.replace(/\+/g, '%20'));
+    let parsedParams = {};
+    let paramsArray = params.split('&');
+    for (let i = 0; i < paramsArray.length; i++) {
+      let key = paramsArray[i].split('=')[0];
+      let value = paramsArray[i].split('=')[1];
+      let decodedValue = decodeURIComponent(value.replace(/\+/g, '%20'));
       parsedParams[key] = decodedValue;
     }
     return parsedParams;

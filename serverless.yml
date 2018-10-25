@@ -4,8 +4,8 @@ provider:
   stage: dev
   region: eu-central-1
   runtime: nodejs8.10
-  memorySize: 128
-  timeout: 3
+  memorySize: 512
+  timeout: 30
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -30,9 +30,17 @@ provider:
   environment:
     DB_TABLE_USER: ${self:service}-${opt:stage, self:provider.stage}-user3
     DB_TABLE_MESSAGE: ${self:service}-${opt:stage, self:provider.stage}-message2
+    AUTH_POOL_NAME: almarein-${opt:stage, self:provider.stage}-user-pool
+    AUTH_CLIENT_NAME: almarein-${opt:stage, self:provider.stage}-user-pool-client
 
 
 functions:
+  preSignUp:
+    handler: handler.preSignUp
+    events:
+      - cognitoUserPool:
+          pool: MainUserPool
+          trigger: PreSignUp
   register:
     handler: handler.register
     events:
@@ -40,11 +48,16 @@ functions:
           path: register
           method: POST
           cors: true
-  registerCognito:
-    handler: handler.registerCognito
+  loginCognito:
+    handler: handler.loginCognito
+    environment:
+      AUTH_POOL_ID:
+        Ref: CognitoUserPoolMainUserPool
+      AUTH_CLIENT_ID:
+        Ref: CognitoUserPoolClient
     events:
       - http:
-          path: registerCognito
+          path: login
           method: POST
           cors: true
   getMessage:
@@ -65,6 +78,28 @@ functions:
 
 resources:
   Resources:
+    CognitoUserPoolMainUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:provider.environment.AUTH_POOL_NAME}
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
+            RequireLowercase: false
+            RequireNumbers: false
+            RequireSymbols: false
+            RequireUppercase: false
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:provider.environment.AUTH_CLIENT_NAME}
+        UserPoolId:
+          Ref: CognitoUserPoolMainUserPool
+        ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+        GenerateSecret: false
+
     UserDynamoDbTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
@@ -183,3 +218,12 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:provider.environment.DB_TABLE_MESSAGE}
+
+Outputs:
+  UserPoolId:
+    Value:
+      Ref: CognitoUserPool
+
+  UserPoolClientId:
+    Value:
+      Ref: CognitoUserPoolClient
