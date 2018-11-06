@@ -17,6 +17,7 @@ provider:
         - dynamodb:DeleteItem
       Resource:
         - { "Fn::GetAtt": ["UserDynamoDbTable", "Arn" ] }
+        - { "Fn::GetAtt": ["AdminDynamoDbTable", "Arn" ] }
         - { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }
         - { "Fn::Join": [ "/", [ 
            { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }, "index", "senderIndex" 
@@ -29,32 +30,13 @@ provider:
           ]]}
   environment:
     DB_TABLE_USER: ${self:service}-${opt:stage, self:provider.stage}-user3
+    DB_TABLE_ADMIN: ${self:service}-${opt:stage, self:provider.stage}-admin
     DB_TABLE_MESSAGE: ${self:service}-${opt:stage, self:provider.stage}-message2
-    AUTH_POOL_NAME: almarein-${opt:stage, self:provider.stage}-user-pool
-    AUTH_CLIENT_NAME: almarein-${opt:stage, self:provider.stage}-user-pool-client
 
 
 functions:
-  preSignUp:
-    handler: handler.preSignUp
-    events:
-      - cognitoUserPool:
-          pool: MainUserPool
-          trigger: PreSignUp
-  register:
-    handler: handler.register
-    events:
-      - http:
-          path: register
-          method: POST
-          cors: true
-  loginCognito:
-    handler: handler.loginCognito
-    environment:
-      AUTH_POOL_ID:
-        Ref: CognitoUserPoolMainUserPool
-      AUTH_CLIENT_ID:
-        Ref: CognitoUserPoolClient
+  login:
+    handler: handler.login
     events:
       - http:
           path: login
@@ -78,28 +60,6 @@ functions:
 
 resources:
   Resources:
-    CognitoUserPoolMainUserPool:
-      Type: AWS::Cognito::UserPool
-      Properties:
-        UserPoolName: ${self:provider.environment.AUTH_POOL_NAME}
-        Policies:
-          PasswordPolicy:
-            MinimumLength: 6
-            RequireLowercase: false
-            RequireNumbers: false
-            RequireSymbols: false
-            RequireUppercase: false
-
-    CognitoUserPoolClient:
-      Type: AWS::Cognito::UserPoolClient
-      Properties:
-        ClientName: ${self:provider.environment.AUTH_CLIENT_NAME}
-        UserPoolId:
-          Ref: CognitoUserPoolMainUserPool
-        ExplicitAuthFlows:
-        - ADMIN_NO_SRP_AUTH
-        GenerateSecret: false
-
     UserDynamoDbTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
@@ -126,8 +86,8 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
           - IndexName: apptokenIndex
             KeySchema:
               - AttributeName: apptoken
@@ -135,8 +95,8 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
           - IndexName: secretIndex
             KeySchema:
               - AttributeName: secret
@@ -144,8 +104,8 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
           - IndexName: timestampIndex
             KeySchema:
               - AttributeName: timestamp
@@ -153,12 +113,51 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: 128
+          WriteCapacityUnits: 128
         TableName: ${self:provider.environment.DB_TABLE_USER}
+
+    AdminDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: username
+          AttributeType: S
+        - AttributeName: apptoken
+          AttributeType: S
+        GlobalSecondaryIndexes:
+        - IndexName: usernameIndex
+          KeySchema:
+          - AttributeName: username
+            KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 64
+            WriteCapacityUnits: 64
+        - IndexName: apptokenIndex
+          KeySchema:
+          - AttributeName: apptoken
+            KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 64
+            WriteCapacityUnits: 64
+        ProvisionedThroughput:
+          ReadCapacityUnits: 128
+          WriteCapacityUnits: 128
+        TableName: ${self:provider.environment.DB_TABLE_ADMIN}
+
     MessageDynamoDbTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
@@ -185,8 +184,8 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
           - IndexName: receiverIndex
             KeySchema:
               - AttributeName: receiver
@@ -194,8 +193,8 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
           - IndexName: messageIndex
             KeySchema:
               - AttributeName: message
@@ -203,8 +202,8 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
           - IndexName: timestampIndex
             KeySchema:
               - AttributeName: timestamp
@@ -212,11 +211,11 @@ resources:
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
+              ReadCapacityUnits: 64
+              WriteCapacityUnits: 64
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: 128
+          WriteCapacityUnits: 128
         TableName: ${self:provider.environment.DB_TABLE_MESSAGE}
 
 Outputs:
