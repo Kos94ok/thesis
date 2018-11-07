@@ -39,7 +39,9 @@ module.exports = {
 
 		let userData = Database.parseJwtToken(getAuthToken(event));
 		if (!userData) {
-			return Callback.instance({ statusCode: 401, body: { error: true, NoAuthHeaderFoundError: true }});
+			return Callback.instance({ statusCode: 401, body: { error: true, noAuthHeaderFoundError: true }});
+		} else if (userData.error && userData.signatureError) {
+			return Callback.instance({ statusCode: 401, body: { error: true, invalidSignatureError: true }});
 		}
 
 		let isUserRegisteredPromise = Database.isUserRegistered(userData.username, userData.apptoken);
@@ -49,16 +51,11 @@ module.exports = {
 		const [ isUserRegistered, isUserAdmin, messageObject ] = await Promise.all([ isUserRegisteredPromise, isUserAdminPromise, messagePromise ]);
 		if (!isUserRegistered) {
 			return Callback.instance({ statusCode: 401, body: { error: true, notRegisteredError: true }});
-		} else if (messageObject === undefined) {
+		} else if (messageObject.error) {
 			return Callback.instance({ statusCode: 404, body: { error: true, messageNotFoundError: true }});
 		}
 
-		console.log(isUserAdmin);
-
 		let receivers = messageObject.receiver.S.split('|');
-		for (let i = 0; i < receivers.length; i++) {
-			receivers[i] = receivers[i].trim();
-		}
 
 		if (userData.username !== messageObject.sender.S && !isUserAdmin && receivers.indexOf(userData.username) === -1) {
 			return Callback.instance({ statusCode: 401, body: { error: true, accessDeniedError: true }});
@@ -81,17 +78,20 @@ module.exports = {
 
 		let userData = Database.parseJwtToken(getAuthToken(event));
 		if (!userData) {
-			return Callback.instance({ statusCode: 401, body: { error: true, noAccessTokenError: true }});
+			return Callback.instance({ statusCode: 401, body: { error: true, noAuthHeaderFoundError: true }});
+		} else if (userData.error && userData.signatureError) {
+			return Callback.instance({ statusCode: 401, body: { error: true, invalidSignatureError: true }});
 		}
 
 		let isUserRegisteredPromise = Database.isUserRegistered(userData.username, userData.apptoken);
 
 		const [ isUserRegistered ] = await Promise.all([ isUserRegisteredPromise ]);
 		if (!isUserRegistered) {
-			return Callback.instance({ statusCode: 401, body: { error: true, NoAuthHeaderFoundError: true }});
+			return Callback.instance({ statusCode: 401, body: { error: true, notRegisteredError: true }});
 		}
 
-		let messageId = await Database.createMessage(userData.username, params.receiver, params.message);
+		let parsedReceivers = Parser.parseMessageReceivers(params.receiver);
+		let messageId = await Database.createMessage(userData.username, parsedReceivers, params.message);
 
 		let responseBody = { messageId: messageId };
 		return Callback.instance({ statusCode: 200, body: responseBody });

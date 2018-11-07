@@ -5,9 +5,7 @@ const uuidv4 = require('uuid/v4');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// TODO: Move to config
-const JWT_SECRET = 'LwazeNN8BeqdbdzCtzYsN26dbZG1T76b';
-const JWT_EXPIRATION_TIME = 60 * 60; // 1 hour
+const JWT_EXPIRATION_TIME = 60 * 60 * 1000; // 1 hour
 
 AWS.config.update({ region: 'eu-central-1' });
 let ddb = new AWS.DynamoDB();
@@ -21,7 +19,7 @@ let resolvePromise = function(resolve, reject, data, err) {
 };
 
 let getCurrentTime = function() {
-	return Math.round((new Date()).getTime() / 1000);
+	return Math.round((new Date()).getTime());
 };
 
 module.exports = {
@@ -35,10 +33,8 @@ module.exports = {
 		};
 		return new Promise(function(resolve) {
 			ddb.getItem(dbParams, function(err, data) {
-				if (data && !err) {
-					resolve(true);
-				}
-				resolve(false)
+				let isFound = Object.keys(data).length > 0;
+				resolve(isFound);
 			});
 		});
 	},
@@ -53,10 +49,8 @@ module.exports = {
 		};
 		return new Promise(function(resolve) {
 			ddb.getItem(dbParams, function(err, data) {
-				if (data && !err) {
-					resolve(true);
-				}
-				resolve(false)
+				let isFound = Object.keys(data).length > 0;
+				resolve(isFound);
 			});
 		});
 	},
@@ -79,13 +73,14 @@ module.exports = {
 			ddb.putItem(dbParams, function(err, data) {
 				if (err) {
 					resolve({ error: true });
+					return;
 				}
 
 				let userData = {
 					username: username,
 					apptoken: apptoken,
 				};
-				let token = jwt.sign({ userData }, JWT_SECRET, { expiresIn: JWT_EXPIRATION_TIME });
+				let token = jwt.sign({ userData }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRATION_TIME });
 				resolve({ success: true, token: token, expiresAt: getCurrentTime() + JWT_EXPIRATION_TIME });
 			});
 		});
@@ -101,21 +96,23 @@ module.exports = {
 		};
 		return new Promise(function(resolve) {
 			ddb.getItem(dbParams, function(err, data) {
-				if (Object.keys(data).length > 0) {
-					let hashedSecret = data.Item.secret.S;
-
-					if (!bcrypt.compareSync(secret, hashedSecret)) {
-						resolve({ error: true, passwordError: true });
-					}
-
-					let userData = {
-						username: username,
-						apptoken: apptoken,
-					};
-					let token = jwt.sign({ userData }, JWT_SECRET, { expiresIn: JWT_EXPIRATION_TIME });
-					resolve({ success: true, token: token, expiresAt: getCurrentTime() + JWT_EXPIRATION_TIME });
+				if (Object.keys(data).length === 0) {
+					resolve({ error: true });
+					return;
 				}
-				resolve({ error: true });
+
+				let hashedSecret = data.Item.secret.S;
+				if (!bcrypt.compareSync(secret, hashedSecret)) {
+					resolve({ error: true, passwordError: true });
+					return;
+				}
+
+				let userData = {
+					username: username,
+					apptoken: apptoken,
+				};
+				let token = jwt.sign({ userData }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRATION_TIME });
+				resolve({ success: true, token: token, expiresAt: getCurrentTime() + JWT_EXPIRATION_TIME });
 			});
 		});
 	},
@@ -126,7 +123,7 @@ module.exports = {
 		}
 
 		try {
-			const decodedToken = jwt.verify(token, JWT_SECRET);
+			const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
 			return decodedToken.userData;
 		} catch(err) {
 			return { error: true, signatureError: true };
@@ -142,7 +139,13 @@ module.exports = {
 	};
 	return new Promise(function(resolve, reject) {
 	  ddb.getItem(dbParams, function(err, data) {
-		resolvePromise(resolve, reject, data.Item, err);
+	  	if (err || !data || !data.Item) {
+	  		resolve({ error: true, noMessageFoundError: true });
+	  		return;
+		}
+		let responseBody = JSON.parse(JSON.stringify(data.Item));
+	  	responseBody.success = true;
+	  	resolve(responseBody);
 	  });
 	});
   },

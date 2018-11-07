@@ -29,10 +29,18 @@ provider:
             { "Fn::GetAtt": ["MessageDynamoDbTable", "Arn" ] }, "index", "messageIndex"
           ]]}
   environment:
-    DB_TABLE_USER: ${self:service}-${opt:stage, self:provider.stage}-user3
+    DB_TABLE_USER: ${self:service}-${opt:stage, self:provider.stage}-user
     DB_TABLE_ADMIN: ${self:service}-${opt:stage, self:provider.stage}-admin
-    DB_TABLE_MESSAGE: ${self:service}-${opt:stage, self:provider.stage}-message2
+    DB_TABLE_MESSAGE: ${self:service}-${opt:stage, self:provider.stage}-message
+    JWT_SECRET: ${self:custom.secrets.JWT_SECRET}
 
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  secrets: ${file(secrets.yml):${self:custom.stage}}
+
+package:
+  exclude:
+    - secrets.yml
 
 functions:
   login:
